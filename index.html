@@ -8,22 +8,39 @@
 
 body{
 font-family:sans-serif;
-background:#f0f0f0;
+margin:0;
 text-align:center;
+background:var(--bg);
+color:var(--text);
+}
+
+:root{
+--bg:#f0f0f0;
+--card:white;
+--text:black;
+}
+
+.dark{
+--bg:#111;
+--card:#1e1e1e;
+--text:white;
 }
 
 #top{
-background:white;
+background:var(--card);
 padding:10px;
-margin-bottom:10px;
+display:flex;
+justify-content:space-between;
+align-items:center;
 }
 
 .post{
-background:white;
+background:var(--card);
 margin:10px auto;
 padding:10px;
-border-radius:10px;
+border-radius:15px;
 max-width:400px;
+position:relative;
 }
 
 .avatar{
@@ -31,16 +48,45 @@ width:40px;
 height:40px;
 border-radius:50%;
 object-fit:cover;
+cursor:pointer;
 }
 
-img.postimg{
+.postimg{
 max-width:100%;
 border-radius:10px;
 margin-top:5px;
 }
 
 button{
-margin:3px;
+border:none;
+padding:6px 12px;
+border-radius:20px;
+cursor:pointer;
+margin:2px;
+}
+
+.bubble{
+background:#007aff;
+color:white;
+}
+
+.delete{
+background:#ff3b30;
+color:white;
+position:absolute;
+top:10px;
+right:10px;
+}
+
+#profile{
+position:fixed;
+top:0;
+left:0;
+width:100%;
+height:100%;
+background:var(--bg);
+display:none;
+overflow:auto;
 }
 
 </style>
@@ -50,10 +96,9 @@ margin:3px;
 
 <div id="login">
 
-<h2>Write your nickname</h2>
+<h2>Nickname</h2>
 
 <input id="nickname"><br><br>
-
 <input type="file" id="avatarInput"><br><br>
 
 <button onclick="login()">Enter</button>
@@ -63,23 +108,45 @@ margin:3px;
 <div id="app" style="display:none">
 
 <div id="top">
+
+<div>
 <img id="myavatar" class="avatar">
 <b id="user"></b>
 </div>
 
+<button onclick="toggleTheme()">🌙</button>
+
+</div>
+
+<br>
+
 <input id="text" placeholder="Write post"><br><br>
 <input type="file" id="photo"><br><br>
 
-<button onclick="post()">Post</button>
+<button class="bubble" onclick="post()">Post</button>
 
 <div id="posts"></div>
+
+</div>
+
+<div id="profile">
+
+<div style="font-size:25px;cursor:pointer" onclick="closeProfile()">❌</div>
+
+<img id="profileAvatar" class="avatar" style="width:80px;height:80px">
+
+<h2 id="profileName"></h2>
+
+<div id="profilePosts"></div>
 
 </div>
 
 <script type="module">
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getFirestore, collection, addDoc, onSnapshot, updateDoc, doc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+import { getFirestore, collection, addDoc, onSnapshot, updateDoc, doc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
 
 const firebaseConfig = {
 
@@ -99,6 +166,12 @@ let username=localStorage.getItem("username")
 let avatar=localStorage.getItem("avatar")
 
 if(username){
+
+loginSuccess()
+
+}
+
+function loginSuccess(){
 
 document.getElementById("login").style.display="none"
 document.getElementById("app").style.display="block"
@@ -130,25 +203,9 @@ reader.readAsDataURL(file)
 
 }
 
-let lastMessage=""
-let lastTime=0
-
 window.post=async function(){
 
 let text=document.getElementById("text").value
-
-let now=Date.now()
-
-if(text===lastMessage && now-lastTime<60000){
-
-alert("Same message allowed after 1 minute")
-return
-
-}
-
-lastMessage=text
-lastTime=now
-
 let photoFile=document.getElementById("photo").files[0]
 let photo=""
 
@@ -208,38 +265,46 @@ let div=document.createElement("div")
 div.className="post"
 
 let img=""
-
 if(data.photo){
 img="<img class='postimg' src='"+data.photo+"'>"
 }
 
+let del=""
+if(data.user==username){
+
+del="<button class='delete' onclick='delPost(\""+docSnap.id+"\")'>🗑</button>"
+
+}
+
 div.innerHTML=
 
-"<img class='avatar' src='"+data.avatar+"'> <b>"+data.user+"</b><br>"+
+del+
+
+"<img onclick='openProfile(\""+data.user+"\")' class='avatar' src='"+data.avatar+"'> "+
+
+"<b onclick='openProfile(\""+data.user+"\")'>"+data.user+"</b><br>"+
 
 data.text+"<br>"+img+
 
-"<button id='l"+docSnap.id+"'>👍 "+data.like+"</button>"+
+"<br>"+
 
-"<button id='h"+docSnap.id+"'>❤️ "+data.love+"</button>"+
+"<button onclick='react(\""+docSnap.id+"\",\"like\","+data.like+")'>👍 "+data.like+"</button>"+
 
-"<button id='c"+docSnap.id+"'>😂 "+data.laugh+"</button>"
+"<button onclick='react(\""+docSnap.id+"\",\"love\","+data.love+")'>❤️ "+data.love+"</button>"+
+
+"<button onclick='react(\""+docSnap.id+"\",\"laugh\","+data.laugh+")'>😂 "+data.laugh+"</button>"
 
 document.getElementById("posts").prepend(div)
 
-document.getElementById("l"+docSnap.id).onclick=()=>react(docSnap.id,"like",data.like)
-document.getElementById("h"+docSnap.id).onclick=()=>react(docSnap.id,"love",data.love)
-document.getElementById("c"+docSnap.id).onclick=()=>react(docSnap.id,"laugh",data.laugh)
-
 })
 
 })
 
-async function react(id,type,count){
+window.react=async function(id,type,count){
 
 if(reacted[id]){
 
-alert("You already reacted")
+alert("Already reacted")
 return
 
 }
@@ -252,6 +317,70 @@ let update={}
 update[type]=count+1
 
 await updateDoc(ref,update)
+
+}
+
+window.delPost=async function(id){
+
+await deleteDoc(doc(db,"posts",id))
+
+}
+
+window.openProfile=function(name){
+
+document.getElementById("profile").style.display="block"
+document.getElementById("app").style.display="none"
+
+document.getElementById("profileName").innerText=name
+
+onSnapshot(collection(db,"posts"),(snapshot)=>{
+
+document.getElementById("profilePosts").innerHTML=""
+
+snapshot.forEach((docSnap)=>{
+
+let data=docSnap.data()
+
+if(data.user==name){
+
+let div=document.createElement("div")
+div.className="post"
+
+let img=""
+if(data.photo){
+img="<img class='postimg' src='"+data.photo+"'>"
+}
+
+div.innerHTML=
+
+"<img class='avatar' src='"+data.avatar+"'> "+
+
+"<b>"+data.user+"</b><br>"+
+
+data.text+"<br>"+img
+
+document.getElementById("profilePosts").append(div)
+
+document.getElementById("profileAvatar").src=data.avatar
+
+}
+
+})
+
+})
+
+}
+
+window.closeProfile=function(){
+
+document.getElementById("profile").style.display="none"
+document.getElementById("app").style.display="block"
+
+}
+
+window.toggleTheme=function(){
+
+document.body.classList.toggle("dark")
 
 }
 
