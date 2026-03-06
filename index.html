@@ -1,9 +1,11 @@
 <!DOCTYPE html>
 <html>
 <head>
+<meta charset="UTF-8">
 <title>My Social</title>
 
 <style>
+
 body{
 font-family:sans-serif;
 background:#f0f0f0;
@@ -16,65 +18,117 @@ padding:10px;
 margin-bottom:10px;
 }
 
+.avatar{
+font-size:28px;
+}
+
 .post{
 background:white;
-margin:10px;
+margin:10px auto;
 padding:10px;
 border-radius:10px;
+max-width:400px;
 }
 
 img{
-max-width:200px;
+max-width:100%;
 border-radius:10px;
 margin-top:5px;
 }
 
 button{
-margin:3px;
+margin:4px;
 }
-</style>
 
+</style>
 </head>
 
 <body>
 
 <div id="login">
+
 <h2>Write your nickname</h2>
-<input id="nickname">
+
+<input id="nickname"><br><br>
+
+<select id="avatar">
+<option>😀</option>
+<option>😎</option>
+<option>🐱</option>
+<option>🤖</option>
+<option>👑</option>
+</select>
+
+<br><br>
+
 <button onclick="login()">Enter</button>
+
 </div>
 
 <div id="app" style="display:none">
 
 <div id="top">
+<span id="myavatar" class="avatar"></span>
 <b id="user"></b>
 </div>
 
-<input id="text" placeholder="Write post">
-<input type="file" id="photo">
-<br>
+<input id="text" placeholder="Write post"><br><br>
+
+<input type="file" id="photo"><br><br>
+
 <button onclick="post()">Post</button>
 
 <div id="posts"></div>
 
 </div>
 
-<script>
 
-let username=""
-let postCount=0
-let today=new Date().toDateString()
+<script type="module">
 
-function login(){
-username=document.getElementById("nickname").value
-if(username=="")return
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { getFirestore, collection, addDoc, onSnapshot, updateDoc, doc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+const firebaseConfig = {
+apiKey: "PASTE",
+authDomain: "PASTE",
+projectId: "PASTE",
+storageBucket: "PASTE",
+messagingSenderId: "PASTE",
+appId: "PASTE"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+let username=localStorage.getItem("username")
+let avatar=localStorage.getItem("avatar")
+
+if(username){
 
 document.getElementById("login").style.display="none"
 document.getElementById("app").style.display="block"
-document.getElementById("user").innerText="Logged as: "+username
+
+document.getElementById("user").innerText=username
+document.getElementById("myavatar").innerText=avatar
+
 }
 
-function post(){
+window.login=function(){
+
+username=document.getElementById("nickname").value
+avatar=document.getElementById("avatar").value
+
+localStorage.setItem("username",username)
+localStorage.setItem("avatar",avatar)
+
+location.reload()
+
+}
+
+let postCount=0
+let today=new Date().toDateString()
+
+window.post=async function(){
 
 let now=new Date().toDateString()
 
@@ -84,59 +138,64 @@ postCount=0
 }
 
 if(postCount>=100){
-alert("Limit 100 posts per day")
+alert("Limit 100 posts today")
 return
 }
 
 let text=document.getElementById("text").value
-let file=document.getElementById("photo").files[0]
+
+await addDoc(collection(db,"posts"),{
+user:username,
+avatar:avatar,
+text:text,
+like:0,
+love:0,
+laugh:0
+})
+
+postCount++
+
+}
+
+onSnapshot(collection(db,"posts"),(snapshot)=>{
+
+document.getElementById("posts").innerHTML=""
+
+snapshot.forEach((docSnap)=>{
+
+let data=docSnap.data()
 
 let div=document.createElement("div")
 div.className="post"
 
-let name=document.createElement("b")
-name.innerText=username
+div.innerHTML=
 
-let content=document.createElement("p")
-content.innerText=text
+"<span class='avatar'>"+data.avatar+"</span> <b>"+data.user+"</b><br>"+data.text+"<br>"+
 
-div.appendChild(name)
-div.appendChild(content)
+"<button id='l"+docSnap.id+"'>👍 "+data.like+"</button>"+
 
-if(file){
-let img=document.createElement("img")
-img.src=URL.createObjectURL(file)
-div.appendChild(img)
-}
+"<button id='h"+docSnap.id+"'>❤️ "+data.love+"</button>"+
 
-let like=document.createElement("button")
-like.innerText="👍 0"
-like.onclick=function(){
-let n=parseInt(like.innerText.split(" ")[1])+1
-like.innerText="👍 "+n
-}
-
-let love=document.createElement("button")
-love.innerText="❤️ 0"
-love.onclick=function(){
-let n=parseInt(love.innerText.split(" ")[1])+1
-love.innerText="❤️ "+n
-}
-
-let laugh=document.createElement("button")
-laugh.innerText="😂 0"
-laugh.onclick=function(){
-let n=parseInt(laugh.innerText.split(" ")[1])+1
-laugh.innerText="😂 "+n
-}
-
-div.appendChild(like)
-div.appendChild(love)
-div.appendChild(laugh)
+"<button id='c"+docSnap.id+"'>😂 "+data.laugh+"</button>"
 
 document.getElementById("posts").prepend(div)
 
-postCount++
+document.getElementById("l"+docSnap.id).onclick=()=>react(docSnap.id,"like",data.like)
+document.getElementById("h"+docSnap.id).onclick=()=>react(docSnap.id,"love",data.love)
+document.getElementById("c"+docSnap.id).onclick=()=>react(docSnap.id,"laugh",data.laugh)
+
+})
+
+})
+
+async function react(id,type,count){
+
+let ref=doc(db,"posts",id)
+
+let update={}
+update[type]=count+1
+
+await updateDoc(ref,update)
 
 }
 
