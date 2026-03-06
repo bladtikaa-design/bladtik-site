@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>BLADTIK SITE</title>
+<title>My Social</title>
 
 <style>
 
@@ -13,14 +13,9 @@ text-align:center;
 margin:0;
 }
 
-#logo{
-position:fixed;
-top:10px;
-right:10px;
-color:white;
--webkit-text-stroke:1px black;
-font-weight:bold;
-font-size:20px;
+#top{
+background:white;
+padding:10px;
 }
 
 .post{
@@ -56,10 +51,6 @@ border-radius:10px;
 cursor:pointer;
 }
 
-.reactions button{
-margin:3px;
-}
-
 .dark{
 background:#111;
 color:white;
@@ -74,8 +65,6 @@ background:#1e1e1e;
 
 <body>
 
-<div id="logo">BLADTIK SITE</div>
-
 <div id="login">
 
 <h2>Nickname</h2>
@@ -89,7 +78,7 @@ background:#1e1e1e;
 
 <div id="app" style="display:none">
 
-<div>
+<div id="top">
 
 <img id="myavatar" class="avatar">
 <b id="user"></b>
@@ -105,11 +94,6 @@ background:#1e1e1e;
 
 <button onclick="post()">Post</button>
 
-<br><br>
-
-<button onclick="startRecord()">🎤 Record</button>
-<button onclick="stopRecord()">Stop</button>
-
 <div id="posts"></div>
 
 </div>
@@ -120,9 +104,13 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/12.10.0/fireba
 import { getFirestore, collection, addDoc, onSnapshot, updateDoc, doc, deleteDoc } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-firestore.js";
 
 const firebaseConfig = {
-apiKey: "AIzaSyAE46eiz4XltTwoPz4mVFG6kvP",
+apiKey: "AIzaSyAE46eiz4XltTwoPz4mVFG6kvPqAIhVf10",
 authDomain: "mysocial-dabdf.firebaseapp.com",
-projectId: "mysocial-dabdf"
+projectId: "mysocial-dabdf",
+storageBucket: "mysocial-dabdf.firebasestorage.app",
+messagingSenderId: "812073291348",
+appId: "1:812073291348:web:e68dbf6c412c72de5aa7c1",
+measurementId: "G-24XWVXT1HV"
 };
 
 const app = initializeApp(firebaseConfig);
@@ -130,8 +118,6 @@ const db = getFirestore(app);
 
 let username=localStorage.getItem("username")
 let avatar=localStorage.getItem("avatar")
-
-let lastPostTime=0
 
 if(username){
 
@@ -167,18 +153,8 @@ reader.readAsDataURL(file)
 
 window.post=async function(){
 
-let now=Date.now()
-
-if(now-lastPostTime<40000){
-alert("Подожди 40 секунд перед следующим постом")
-return
-}
-
-lastPostTime=now
-
 let text=document.getElementById("text").value
 let photoFile=document.getElementById("photo").files[0]
-
 let photo=""
 
 if(photoFile){
@@ -190,17 +166,13 @@ reader.onload=async function(){
 photo=reader.result
 
 await addDoc(collection(db,"posts"),{
+
 user:username,
 avatar:avatar,
 text:text,
 photo:photo,
-voice:"",
-reactions:{
-"👍":[],
-"🐷":[],
-"🙉":[],
-"💩":[]
-}
+like:0
+
 })
 
 }
@@ -210,17 +182,13 @@ reader.readAsDataURL(photoFile)
 }else{
 
 await addDoc(collection(db,"posts"),{
+
 user:username,
 avatar:avatar,
 text:text,
 photo:"",
-voice:"",
-reactions:{
-"👍":[],
-"🐷":[],
-"🙉":[],
-"💩":[]
-}
+like:0
+
 })
 
 }
@@ -239,35 +207,30 @@ let div=document.createElement("div")
 div.className="post"
 
 let img=""
+
 if(data.photo){
+
 img="<img class='postimg' src='"+data.photo+"'>"
+
 }
 
-let voice=""
-if(data.voice){
-voice="<audio controls src='"+data.voice+"'></audio>"
-}
+let del=""
 
-let reactions=data.reactions||{
-"👍":[],
-"🐷":[],
-"🙉":[],
-"💩":[]
+if(data.user==username){
+
+del="<button class='delete' onclick='delPost(\""+docSnap.id+"\")'>🗑</button>"
+
 }
 
 div.innerHTML=
 
-"<img class='avatar' src='"+data.avatar+"'> <b>"+data.user+"</b><br>"+
-data.text+"<br>"+
-img+"<br>"+
-voice+"<br>"+
+del+
 
-"<div class='reactions'>"+
-"<button onclick='react(\""+docSnap.id+"\",\"👍\")'>👍 "+reactions["👍"].length+"</button>"+
-"<button onclick='react(\""+docSnap.id+"\",\"🐷\")'>🐷 "+reactions["🐷"].length+"</button>"+
-"<button onclick='react(\""+docSnap.id+"\",\"🙉\")'>🙉 "+reactions["🙉"].length+"</button>"+
-"<button onclick='react(\""+docSnap.id+"\",\"💩\")'>💩 "+reactions["💩"].length+"</button>"+
-"</div>"
+"<img class='avatar' src='"+data.avatar+"'> <b>"+data.user+"</b><br>"+
+
+data.text+"<br>"+img+
+
+"<br><button onclick='like(\""+docSnap.id+"\","+data.like+")'>👍 "+data.like+"</button>"
 
 document.getElementById("posts").prepend(div)
 
@@ -275,83 +238,27 @@ document.getElementById("posts").prepend(div)
 
 })
 
-window.react=async function(id,emoji){
+window.like=async function(id,count){
 
 let ref=doc(db,"posts",id)
 
-onSnapshot(ref, async (snap)=>{
+await updateDoc(ref,{like:count+1})
 
-let data=snap.data()
-
-let reactions=data.reactions
-
-for(let key in reactions){
-reactions[key]=reactions[key].filter(u=>u!==username)
 }
 
-reactions[emoji].push(username)
+window.delPost=async function(id){
 
-await updateDoc(ref,{reactions:reactions})
-
-})
+await deleteDoc(doc(db,"posts",id))
 
 }
 
 window.theme=function(){
+
 document.body.classList.toggle("dark")
-}
-
-let recorder
-let chunks=[]
-
-window.startRecord=async function(){
-
-let stream=await navigator.mediaDevices.getUserMedia({audio:true})
-
-recorder=new MediaRecorder(stream)
-
-recorder.ondataavailable=e=>chunks.push(e.data)
-
-recorder.start()
-
-}
-
-window.stopRecord=function(){
-
-recorder.stop()
-
-recorder.onstop=async function(){
-
-let blob=new Blob(chunks)
-chunks=[]
-
-let reader=new FileReader()
-
-reader.onload=async function(){
-
-await addDoc(collection(db,"posts"),{
-user:username,
-avatar:avatar,
-text:"",
-photo:"",
-voice:reader.result,
-reactions:{
-"👍":[],
-"🐷":[],
-"🙉":[],
-"💩":[]
-}
-})
-
-}
-
-reader.readAsDataURL(blob)
-
-}
 
 }
 
 </script>
 
 </body>
-</html>
+</html> 
