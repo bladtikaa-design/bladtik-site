@@ -18,10 +18,6 @@ padding:10px;
 margin-bottom:10px;
 }
 
-.avatar{
-font-size:28px;
-}
-
 .post{
 background:white;
 margin:10px auto;
@@ -30,14 +26,21 @@ border-radius:10px;
 max-width:400px;
 }
 
-img{
+.avatar{
+width:40px;
+height:40px;
+border-radius:50%;
+object-fit:cover;
+}
+
+img.postimg{
 max-width:100%;
 border-radius:10px;
 margin-top:5px;
 }
 
 button{
-margin:4px;
+margin:3px;
 }
 
 </style>
@@ -51,15 +54,7 @@ margin:4px;
 
 <input id="nickname"><br><br>
 
-<select id="avatar">
-<option>😀</option>
-<option>😎</option>
-<option>🐱</option>
-<option>🤖</option>
-<option>👑</option>
-</select>
-
-<br><br>
+<input type="file" id="avatarInput"><br><br>
 
 <button onclick="login()">Enter</button>
 
@@ -68,12 +63,11 @@ margin:4px;
 <div id="app" style="display:none">
 
 <div id="top">
-<span id="myavatar" class="avatar"></span>
+<img id="myavatar" class="avatar">
 <b id="user"></b>
 </div>
 
 <input id="text" placeholder="Write post"><br><br>
-
 <input type="file" id="photo"><br><br>
 
 <button onclick="post()">Post</button>
@@ -82,19 +76,20 @@ margin:4px;
 
 </div>
 
-
 <script type="module">
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getFirestore, collection, addDoc, onSnapshot, updateDoc, doc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 const firebaseConfig = {
+
 apiKey: "PASTE",
 authDomain: "PASTE",
 projectId: "PASTE",
 storageBucket: "PASTE",
 messagingSenderId: "PASTE",
 appId: "PASTE"
+
 };
 
 const app = initializeApp(firebaseConfig);
@@ -109,14 +104,20 @@ document.getElementById("login").style.display="none"
 document.getElementById("app").style.display="block"
 
 document.getElementById("user").innerText=username
-document.getElementById("myavatar").innerText=avatar
+document.getElementById("myavatar").src=avatar
 
 }
 
 window.login=function(){
 
 username=document.getElementById("nickname").value
-avatar=document.getElementById("avatar").value
+
+let file=document.getElementById("avatarInput").files[0]
+let reader=new FileReader()
+
+reader.onload=function(){
+
+avatar=reader.result
 
 localStorage.setItem("username",username)
 localStorage.setItem("avatar",avatar)
@@ -125,37 +126,75 @@ location.reload()
 
 }
 
-let postCount=0
-let today=new Date().toDateString()
+reader.readAsDataURL(file)
+
+}
+
+let lastMessage=""
+let lastTime=0
 
 window.post=async function(){
 
-let now=new Date().toDateString()
-
-if(now!=today){
-today=now
-postCount=0
-}
-
-if(postCount>=100){
-alert("Limit 100 posts today")
-return
-}
-
 let text=document.getElementById("text").value
 
+let now=Date.now()
+
+if(text===lastMessage && now-lastTime<60000){
+
+alert("Same message allowed after 1 minute")
+return
+
+}
+
+lastMessage=text
+lastTime=now
+
+let photoFile=document.getElementById("photo").files[0]
+let photo=""
+
+if(photoFile){
+
+let reader=new FileReader()
+
+reader.onload=async function(){
+
+photo=reader.result
+
 await addDoc(collection(db,"posts"),{
+
 user:username,
 avatar:avatar,
 text:text,
+photo:photo,
 like:0,
 love:0,
 laugh:0
+
 })
 
-postCount++
+}
+
+reader.readAsDataURL(photoFile)
+
+}else{
+
+await addDoc(collection(db,"posts"),{
+
+user:username,
+avatar:avatar,
+text:text,
+photo:"",
+like:0,
+love:0,
+laugh:0
+
+})
 
 }
+
+}
+
+let reacted={}
 
 onSnapshot(collection(db,"posts"),(snapshot)=>{
 
@@ -168,9 +207,17 @@ let data=docSnap.data()
 let div=document.createElement("div")
 div.className="post"
 
+let img=""
+
+if(data.photo){
+img="<img class='postimg' src='"+data.photo+"'>"
+}
+
 div.innerHTML=
 
-"<span class='avatar'>"+data.avatar+"</span> <b>"+data.user+"</b><br>"+data.text+"<br>"+
+"<img class='avatar' src='"+data.avatar+"'> <b>"+data.user+"</b><br>"+
+
+data.text+"<br>"+img+
 
 "<button id='l"+docSnap.id+"'>👍 "+data.like+"</button>"+
 
@@ -189,6 +236,15 @@ document.getElementById("c"+docSnap.id).onclick=()=>react(docSnap.id,"laugh",dat
 })
 
 async function react(id,type,count){
+
+if(reacted[id]){
+
+alert("You already reacted")
+return
+
+}
+
+reacted[id]=true
 
 let ref=doc(db,"posts",id)
 
