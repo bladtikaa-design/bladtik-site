@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>My Social</title>
+
+<style>
+body{
+font-family:sans-serif;
+background:#f0f0f0;
+text-align:center;
+}
+
+#top{
+background:white;
+padding:10px;
+margin-bottom:10px;
+}
+
+.post{
+background:white;
+margin:10px;
+padding:10px;
+border-radius:10px;
+}
+
+img{
+max-width:200px;
+border-radius:10px;
+margin-top:5px;
+}
+
+button{
+margin:3px;
+}
+</style>
+
+</head>
+
+<body>
+
+<div id="login">
+<h2>Write your nickname</h2>
+<input id="nickname">
+<button onclick="login()">Enter</button>
+</div>
+
+<div id="app" style="display:none">
+
+<div id="top">
+<b id="user"></b>
+</div>
+
+<input id="text" placeholder="Write post">
+<input type="file" id="photo">
+<br>
+<button onclick="post()">Post</button>
+
+<div id="posts"></div>
+
+</div>
+
+<script>
+
+let username=""
+let postCount=0
+let today=new Date().toDateString()
+
+function login(){
+username=document.getElementById("nickname").value
+if(username=="")return
+
+document.getElementById("login").style.display="none"
+document.getElementById("app").style.display="block"
+document.getElementById("user").innerText="Logged as: "+username
+}
+
+function post(){
+
+let now=new Date().toDateString()
+
+if(now!=today){
+today=now
+postCount=0
+}
+
+if(postCount>=100){
+alert("Limit 100 posts per day")
+return
+}
+
+let text=document.getElementById("text").value
+let file=document.getElementById("photo").files[0]
+
+let div=document.createElement("div")
+div.className="post"
+
+let name=document.createElement("b")
+name.innerText=username
+
+let content=document.createElement("p")
+content.innerText=text
+
+div.appendChild(name)
+div.appendChild(content)
+
+if(file){
+let img=document.createElement("img")
+img.src=URL.createObjectURL(file)
+div.appendChild(img)
+}
+
+let like=document.createElement("button")
+like.innerText="👍 0"
+like.onclick=function(){
+let n=parseInt(like.innerText.split(" ")[1])+1
+like.innerText="👍 "+n
+}
+
+let love=document.createElement("button")
+love.innerText="❤️ 0"
+love.onclick=function(){
+let n=parseInt(love.innerText.split(" ")[1])+1
+love.innerText="❤️ "+n
+}
+
+let laugh=document.createElement("button")
+laugh.innerText="😂 0"
+laugh.onclick=function(){
+let n=parseInt(laugh.innerText.split(" ")[1])+1
+laugh.innerText="😂 "+n
+}
+
+div.appendChild(like)
+div.appendChild(love)
+div.appendChild(laugh)
+
+document.getElementById("posts").prepend(div)
+
+postCount++
+
+}
+
+</script>
+
+</body>
+</html>
