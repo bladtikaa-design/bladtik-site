@@ -8,37 +8,21 @@
 
 body{
 font-family:sans-serif;
-margin:0;
+background:#f0f0f0;
 text-align:center;
-background:var(--bg);
-color:var(--text);
-}
-
-:root{
---bg:#f0f0f0;
---card:white;
---text:black;
-}
-
-.dark{
---bg:#111;
---card:#1e1e1e;
---text:white;
+margin:0;
 }
 
 #top{
-background:var(--card);
+background:white;
 padding:10px;
-display:flex;
-justify-content:space-between;
-align-items:center;
 }
 
 .post{
-background:var(--card);
+background:white;
 margin:10px auto;
 padding:10px;
-border-radius:15px;
+border-radius:10px;
 max-width:400px;
 position:relative;
 }
@@ -48,7 +32,6 @@ width:40px;
 height:40px;
 border-radius:50%;
 object-fit:cover;
-cursor:pointer;
 }
 
 .postimg{
@@ -57,36 +40,24 @@ border-radius:10px;
 margin-top:5px;
 }
 
-button{
-border:none;
-padding:6px 12px;
-border-radius:20px;
-cursor:pointer;
-margin:2px;
-}
-
-.bubble{
-background:#007aff;
-color:white;
-}
-
 .delete{
-background:#ff3b30;
-color:white;
 position:absolute;
-top:10px;
-right:10px;
+top:5px;
+right:5px;
+border:none;
+background:red;
+color:white;
+border-radius:10px;
+cursor:pointer;
 }
 
-#profile{
-position:fixed;
-top:0;
-left:0;
-width:100%;
-height:100%;
-background:var(--bg);
-display:none;
-overflow:auto;
+.dark{
+background:#111;
+color:white;
+}
+
+.dark .post{
+background:#1e1e1e;
 }
 
 </style>
@@ -109,12 +80,10 @@ overflow:auto;
 
 <div id="top">
 
-<div>
 <img id="myavatar" class="avatar">
 <b id="user"></b>
-</div>
 
-<button onclick="toggleTheme()">🌙</button>
+<button onclick="theme()">🌙</button>
 
 </div>
 
@@ -123,40 +92,25 @@ overflow:auto;
 <input id="text" placeholder="Write post"><br><br>
 <input type="file" id="photo"><br><br>
 
-<button class="bubble" onclick="post()">Post</button>
+<button onclick="post()">Post</button>
 
 <div id="posts"></div>
 
 </div>
 
-<div id="profile">
-
-<div style="font-size:25px;cursor:pointer" onclick="closeProfile()">❌</div>
-
-<img id="profileAvatar" class="avatar" style="width:80px;height:80px">
-
-<h2 id="profileName"></h2>
-
-<div id="profilePosts"></div>
-
-</div>
-
 <script type="module">
 
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-
-import { getFirestore, collection, addDoc, onSnapshot, updateDoc, doc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js";
+import { getFirestore, collection, addDoc, onSnapshot, updateDoc, doc, deleteDoc } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-firestore.js";
 
 const firebaseConfig = {
-
-apiKey: "PASTE",
-authDomain: "PASTE",
-projectId: "PASTE",
-storageBucket: "PASTE",
-messagingSenderId: "PASTE",
-appId: "PASTE"
-
+apiKey: "AIzaSyAE46eiz4XltTwoPz4mVFG6kvPqAIhVf10",
+authDomain: "mysocial-dabdf.firebaseapp.com",
+projectId: "mysocial-dabdf",
+storageBucket: "mysocial-dabdf.firebasestorage.app",
+messagingSenderId: "812073291348",
+appId: "1:812073291348:web:e68dbf6c412c72de5aa7c1",
+measurementId: "G-24XWVXT1HV"
 };
 
 const app = initializeApp(firebaseConfig);
@@ -166,12 +120,6 @@ let username=localStorage.getItem("username")
 let avatar=localStorage.getItem("avatar")
 
 if(username){
-
-loginSuccess()
-
-}
-
-function loginSuccess(){
 
 document.getElementById("login").style.display="none"
 document.getElementById("app").style.display="block"
@@ -223,9 +171,7 @@ user:username,
 avatar:avatar,
 text:text,
 photo:photo,
-like:0,
-love:0,
-laugh:0
+like:0
 
 })
 
@@ -241,17 +187,13 @@ user:username,
 avatar:avatar,
 text:text,
 photo:"",
-like:0,
-love:0,
-laugh:0
+like:0
 
 })
 
 }
 
 }
-
-let reacted={}
 
 onSnapshot(collection(db,"posts"),(snapshot)=>{
 
@@ -265,11 +207,15 @@ let div=document.createElement("div")
 div.className="post"
 
 let img=""
+
 if(data.photo){
+
 img="<img class='postimg' src='"+data.photo+"'>"
+
 }
 
 let del=""
+
 if(data.user==username){
 
 del="<button class='delete' onclick='delPost(\""+docSnap.id+"\")'>🗑</button>"
@@ -280,19 +226,11 @@ div.innerHTML=
 
 del+
 
-"<img onclick='openProfile(\""+data.user+"\")' class='avatar' src='"+data.avatar+"'> "+
-
-"<b onclick='openProfile(\""+data.user+"\")'>"+data.user+"</b><br>"+
+"<img class='avatar' src='"+data.avatar+"'> <b>"+data.user+"</b><br>"+
 
 data.text+"<br>"+img+
 
-"<br>"+
-
-"<button onclick='react(\""+docSnap.id+"\",\"like\","+data.like+")'>👍 "+data.like+"</button>"+
-
-"<button onclick='react(\""+docSnap.id+"\",\"love\","+data.love+")'>❤️ "+data.love+"</button>"+
-
-"<button onclick='react(\""+docSnap.id+"\",\"laugh\","+data.laugh+")'>😂 "+data.laugh+"</button>"
+"<br><button onclick='like(\""+docSnap.id+"\","+data.like+")'>👍 "+data.like+"</button>"
 
 document.getElementById("posts").prepend(div)
 
@@ -300,23 +238,11 @@ document.getElementById("posts").prepend(div)
 
 })
 
-window.react=async function(id,type,count){
-
-if(reacted[id]){
-
-alert("Already reacted")
-return
-
-}
-
-reacted[id]=true
+window.like=async function(id,count){
 
 let ref=doc(db,"posts",id)
 
-let update={}
-update[type]=count+1
-
-await updateDoc(ref,update)
+await updateDoc(ref,{like:count+1})
 
 }
 
@@ -326,59 +252,7 @@ await deleteDoc(doc(db,"posts",id))
 
 }
 
-window.openProfile=function(name){
-
-document.getElementById("profile").style.display="block"
-document.getElementById("app").style.display="none"
-
-document.getElementById("profileName").innerText=name
-
-onSnapshot(collection(db,"posts"),(snapshot)=>{
-
-document.getElementById("profilePosts").innerHTML=""
-
-snapshot.forEach((docSnap)=>{
-
-let data=docSnap.data()
-
-if(data.user==name){
-
-let div=document.createElement("div")
-div.className="post"
-
-let img=""
-if(data.photo){
-img="<img class='postimg' src='"+data.photo+"'>"
-}
-
-div.innerHTML=
-
-"<img class='avatar' src='"+data.avatar+"'> "+
-
-"<b>"+data.user+"</b><br>"+
-
-data.text+"<br>"+img
-
-document.getElementById("profilePosts").append(div)
-
-document.getElementById("profileAvatar").src=data.avatar
-
-}
-
-})
-
-})
-
-}
-
-window.closeProfile=function(){
-
-document.getElementById("profile").style.display="none"
-document.getElementById("app").style.display="block"
-
-}
-
-window.toggleTheme=function(){
+window.theme=function(){
 
 document.body.classList.toggle("dark")
 
