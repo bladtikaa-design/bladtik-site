@@ -20,7 +20,7 @@ right:10px;
 color:white;
 -webkit-text-stroke:1px black;
 font-weight:bold;
-font-size:18px;
+font-size:20px;
 }
 
 .post{
@@ -34,7 +34,6 @@ position:relative;
 
 .avatar{
 width:40px;
-height:40px;
 height:40px;
 border-radius:50%;
 object-fit:cover;
@@ -96,7 +95,6 @@ background:#1e1e1e;
 <b id="user"></b>
 
 <button onclick="theme()">🌙</button>
-<button onclick="openGroups()">Groups</button>
 
 </div>
 
@@ -109,27 +107,10 @@ background:#1e1e1e;
 
 <br><br>
 
-<button onclick="startRecord()">🎤 Record voice</button>
+<button onclick="startRecord()">🎤 Record</button>
 <button onclick="stopRecord()">Stop</button>
 
 <div id="posts"></div>
-
-</div>
-
-<div id="groups" style="display:none">
-
-<h2>Groups</h2>
-
-<input id="groupName" placeholder="Group name">
-<input type="file" id="groupAvatar">
-
-<br><br>
-
-<button onclick="createGroup()">Create group</button>
-
-<div id="groupList"></div>
-
-<button onclick="closeGroups()">❌ Back</button>
 
 </div>
 
@@ -139,7 +120,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/12.10.0/fireba
 import { getFirestore, collection, addDoc, onSnapshot, updateDoc, doc, deleteDoc } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-firestore.js";
 
 const firebaseConfig = {
-apiKey: "AIzaSyAE46eiz4XltTwoPz4mVf",
+apiKey: "AIzaSyAE46eiz4XltTwoPz4mVFG6kvP",
 authDomain: "mysocial-dabdf.firebaseapp.com",
 projectId: "mysocial-dabdf"
 };
@@ -150,13 +131,9 @@ const db = getFirestore(app);
 let username=localStorage.getItem("username")
 let avatar=localStorage.getItem("avatar")
 
+let lastPostTime=0
+
 if(username){
-
-loginSuccess()
-
-}
-
-function loginSuccess(){
 
 document.getElementById("login").style.display="none"
 document.getElementById("app").style.display="block"
@@ -190,17 +167,63 @@ reader.readAsDataURL(file)
 
 window.post=async function(){
 
+let now=Date.now()
+
+if(now-lastPostTime<40000){
+alert("Подожди 40 секунд перед следующим постом")
+return
+}
+
+lastPostTime=now
+
 let text=document.getElementById("text").value
+let photoFile=document.getElementById("photo").files[0]
+
+let photo=""
+
+if(photoFile){
+
+let reader=new FileReader()
+
+reader.onload=async function(){
+
+photo=reader.result
 
 await addDoc(collection(db,"posts"),{
+user:username,
+avatar:avatar,
+text:text,
+photo:photo,
+voice:"",
+reactions:{
+"👍":[],
+"🐷":[],
+"🙉":[],
+"💩":[]
+}
+})
 
+}
+
+reader.readAsDataURL(photoFile)
+
+}else{
+
+await addDoc(collection(db,"posts"),{
 user:username,
 avatar:avatar,
 text:text,
 photo:"",
-reactions:{}
-
+voice:"",
+reactions:{
+"👍":[],
+"🐷":[],
+"🙉":[],
+"💩":[]
+}
 })
+
+}
 
 }
 
@@ -215,18 +238,35 @@ let data=docSnap.data()
 let div=document.createElement("div")
 div.className="post"
 
-let reactions=data.reactions||{}
+let img=""
+if(data.photo){
+img="<img class='postimg' src='"+data.photo+"'>"
+}
+
+let voice=""
+if(data.voice){
+voice="<audio controls src='"+data.voice+"'></audio>"
+}
+
+let reactions=data.reactions||{
+"👍":[],
+"🐷":[],
+"🙉":[],
+"💩":[]
+}
 
 div.innerHTML=
 
 "<img class='avatar' src='"+data.avatar+"'> <b>"+data.user+"</b><br>"+
-data.text+
+data.text+"<br>"+
+img+"<br>"+
+voice+"<br>"+
 
 "<div class='reactions'>"+
-"<button onclick='react(\""+docSnap.id+"\",\"👍\")'>👍</button>"+
-"<button onclick='react(\""+docSnap.id+"\",\"🐷\")'>🐷</button>"+
-"<button onclick='react(\""+docSnap.id+"\",\"🙉\")'>🙉</button>"+
-"<button onclick='react(\""+docSnap.id+"\",\"💩\")'>💩</button>"+
+"<button onclick='react(\""+docSnap.id+"\",\"👍\")'>👍 "+reactions["👍"].length+"</button>"+
+"<button onclick='react(\""+docSnap.id+"\",\"🐷\")'>🐷 "+reactions["🐷"].length+"</button>"+
+"<button onclick='react(\""+docSnap.id+"\",\"🙉\")'>🙉 "+reactions["🙉"].length+"</button>"+
+"<button onclick='react(\""+docSnap.id+"\",\"💩\")'>💩 "+reactions["💩"].length+"</button>"+
 "</div>"
 
 document.getElementById("posts").prepend(div)
@@ -239,17 +279,26 @@ window.react=async function(id,emoji){
 
 let ref=doc(db,"posts",id)
 
-let obj={}
-obj["reactions."+username]=emoji
+onSnapshot(ref, async (snap)=>{
 
-await updateDoc(ref,obj)
+let data=snap.data()
+
+let reactions=data.reactions
+
+for(let key in reactions){
+reactions[key]=reactions[key].filter(u=>u!==username)
+}
+
+reactions[emoji].push(username)
+
+await updateDoc(ref,{reactions:reactions})
+
+})
 
 }
 
 window.theme=function(){
-
 document.body.classList.toggle("dark")
-
 }
 
 let recorder
@@ -263,6 +312,14 @@ recorder=new MediaRecorder(stream)
 
 recorder.ondataavailable=e=>chunks.push(e.data)
 
+recorder.start()
+
+}
+
+window.stopRecord=function(){
+
+recorder.stop()
+
 recorder.onstop=async function(){
 
 let blob=new Blob(chunks)
@@ -273,12 +330,17 @@ let reader=new FileReader()
 reader.onload=async function(){
 
 await addDoc(collection(db,"posts"),{
-
 user:username,
 avatar:avatar,
 text:"",
-voice:reader.result
-
+photo:"",
+voice:reader.result,
+reactions:{
+"👍":[],
+"🐷":[],
+"🙉":[],
+"💩":[]
+}
 })
 
 }
@@ -286,76 +348,6 @@ voice:reader.result
 reader.readAsDataURL(blob)
 
 }
-
-recorder.start()
-
-}
-
-window.stopRecord=function(){
-
-recorder.stop()
-
-}
-
-window.openGroups=function(){
-
-document.getElementById("groups").style.display="block"
-document.getElementById("app").style.display="none"
-
-}
-
-window.closeGroups=function(){
-
-document.getElementById("groups").style.display="none"
-document.getElementById("app").style.display="block"
-
-}
-
-window.createGroup=async function(){
-
-let name=document.getElementById("groupName").value
-
-await addDoc(collection(db,"groups"),{
-
-name:name,
-owner:username,
-members:[username]
-
-})
-
-}
-
-onSnapshot(collection(db,"groups"),(snapshot)=>{
-
-document.getElementById("groupList").innerHTML=""
-
-snapshot.forEach((docSnap)=>{
-
-let data=docSnap.data()
-
-let div=document.createElement("div")
-
-div.innerHTML=
-
-"<b>"+data.name+"</b> "+
-"<button onclick='joinGroup(\""+docSnap.id+"\")'>Join</button>"+
-"<button onclick='callGroup()'>📞 Call</button>"
-
-document.getElementById("groupList").append(div)
-
-})
-
-})
-
-window.joinGroup=function(id){
-
-alert("Joined group")
-
-}
-
-window.callGroup=function(){
-
-alert("Group call system coming soon")
 
 }
 
